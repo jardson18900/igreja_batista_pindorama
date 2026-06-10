@@ -1,395 +1,478 @@
 import streamlit as st
 import pandas as pd
 from datetime import date
-import io
+import urllib.request
 
-# ── Configuração da página ──────────────────────────────────────────────────
+# ── Page config ──────────────────────────────────────────────────────────────
 st.set_page_config(
     page_title="Igreja Batista de Pindorama",
     page_icon="✝️",
     layout="wide",
-    initial_sidebar_state="expanded",
+    initial_sidebar_state="collapsed",
 )
 
-# ── CSS personalizado ───────────────────────────────────────────────────────
+# ── CSS ───────────────────────────────────────────────────────────────────────
 st.markdown("""
 <style>
-    @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&family=Inter:wght@300;400;500&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=DM+Sans:wght@300;400;500;600&display=swap');
 
-    html, body, [class*="css"] {
-        font-family: 'Inter', sans-serif;
-    }
-    h1, h2, h3 {
-        font-family: 'Playfair Display', serif;
-    }
+*, html, body { font-family: 'DM Sans', sans-serif; }
+h1,h2,h3,h4 { font-family: 'DM Serif Display', serif; }
 
-    /* Sidebar */
-    [data-testid="stSidebar"] {
-        background: linear-gradient(160deg, #1a1a2e 0%, #16213e 60%, #0f3460 100%);
-    }
-    [data-testid="stSidebar"] * {
-        color: #e0e0e0 !important;
-    }
-    [data-testid="stSidebar"] .stRadio label {
-        color: #c8d6e5 !important;
-    }
+/* Hide default streamlit chrome */
+#MainMenu, footer, header { visibility: hidden; }
+[data-testid="collapsedControl"] { display: none; }
+.block-container { padding: 0 2rem 3rem 2rem !important; max-width: 1200px; }
 
-    /* Cards de métricas */
-    .metric-card {
-        background: linear-gradient(135deg, #ffffff 0%, #f8f9ff 100%);
-        border-radius: 16px;
-        padding: 24px 20px;
-        text-align: center;
-        box-shadow: 0 4px 20px rgba(15, 52, 96, 0.08);
-        border-left: 4px solid #0f3460;
-        margin-bottom: 8px;
-    }
-    .metric-card .value {
-        font-size: 2.4rem;
-        font-weight: 700;
-        color: #0f3460;
-        font-family: 'Playfair Display', serif;
-        line-height: 1;
-    }
-    .metric-card .label {
-        font-size: 0.8rem;
-        color: #666;
-        text-transform: uppercase;
-        letter-spacing: 0.08em;
-        margin-top: 6px;
-    }
+/* ── TOP NAV ── */
+.topnav {
+    background: #0d1f3c;
+    border-radius: 0 0 20px 20px;
+    padding: 0 32px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin: -1rem -2rem 2rem -2rem;
+    box-shadow: 0 4px 24px rgba(13,31,60,0.15);
+}
+.topnav-brand {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 18px 0;
+}
+.topnav-brand .cross { font-size: 1.5rem; }
+.topnav-brand .name {
+    font-family: 'DM Serif Display', serif;
+    color: white;
+    font-size: 1.1rem;
+    line-height: 1.2;
+}
+.topnav-brand .sub {
+    color: #7fa4cc;
+    font-size: 0.72rem;
+    font-weight: 300;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+}
+.topnav-date {
+    color: #7fa4cc;
+    font-size: 0.8rem;
+    font-weight: 300;
+}
 
-    /* Aniversariante card */
-    .birthday-card {
-        background: linear-gradient(135deg, #fff9f0 0%, #fff3e0 100%);
-        border-radius: 12px;
-        padding: 14px 18px;
-        border-left: 4px solid #e67e22;
-        margin-bottom: 10px;
-        display: flex;
-        align-items: center;
-        gap: 12px;
-    }
-    .birthday-card .name {
-        font-weight: 600;
-        color: #1a1a2e;
-        font-size: 0.95rem;
-    }
-    .birthday-card .detail {
-        color: #888;
-        font-size: 0.8rem;
-    }
+/* ── METRIC CARDS ── */
+.metric-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 32px; }
+.mcard {
+    background: white;
+    border-radius: 16px;
+    padding: 22px 20px;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.06), 0 4px 16px rgba(0,0,0,0.04);
+    border-top: 3px solid transparent;
+    transition: transform .15s;
+}
+.mcard:hover { transform: translateY(-2px); }
+.mcard.blue  { border-top-color: #1a56db; }
+.mcard.green { border-top-color: #057a55; }
+.mcard.amber { border-top-color: #c27803; }
+.mcard.rose  { border-top-color: #be185d; }
+.mcard .ico { font-size: 1.5rem; margin-bottom: 8px; }
+.mcard .val {
+    font-family: 'DM Serif Display', serif;
+    font-size: 2.2rem;
+    color: #0d1f3c;
+    line-height: 1;
+}
+.mcard .lbl {
+    font-size: 0.78rem;
+    color: #6b7280;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    margin-top: 4px;
+}
 
-    /* Header */
-    .app-header {
-        background: linear-gradient(135deg, #1a1a2e 0%, #0f3460 100%);
-        border-radius: 16px;
-        padding: 28px 32px;
-        margin-bottom: 24px;
-        color: white;
-    }
-    .app-header h1 {
-        color: white !important;
-        margin: 0;
-        font-size: 1.9rem;
-    }
-    .app-header p {
-        color: #a0b4cc;
-        margin: 4px 0 0 0;
-        font-size: 0.9rem;
-    }
+/* ── SECTION TITLE ── */
+.sec-title {
+    font-family: 'DM Serif Display', serif;
+    font-size: 1.25rem;
+    color: #0d1f3c;
+    margin: 0 0 14px 0;
+    padding-bottom: 8px;
+    border-bottom: 2px solid #f0f4f8;
+}
 
-    /* Upload box */
-    .upload-hint {
-        background: #f0f4ff;
-        border: 2px dashed #0f3460;
-        border-radius: 12px;
-        padding: 16px;
-        color: #0f3460;
-        font-size: 0.85rem;
-        text-align: center;
-        margin-bottom: 16px;
-    }
+/* ── CHART CARD ── */
+.chart-card {
+    background: white;
+    border-radius: 16px;
+    padding: 22px 20px;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.06), 0 4px 16px rgba(0,0,0,0.04);
+    margin-bottom: 16px;
+    height: 100%;
+}
 
-    /* Tabela */
-    .stDataFrame {
-        border-radius: 12px;
-        overflow: hidden;
-    }
+/* ── BIRTHDAY CARDS ── */
+.bday-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; }
+.bday-card {
+    background: white;
+    border-radius: 14px;
+    padding: 16px 18px;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    border-left: 4px solid #c27803;
+}
+.bday-card.today { border-left-color: #be185d; background: #fff5f9; }
+.bday-card.past  { border-left-color: #d1d5db; opacity: 0.7; }
+.bday-ico { font-size: 1.8rem; flex-shrink: 0; }
+.bday-name { font-weight: 600; color: #0d1f3c; font-size: 0.95rem; }
+.bday-detail { color: #6b7280; font-size: 0.8rem; margin-top: 2px; }
 
-    /* Divider */
-    hr { border-color: #e8ecf0; }
+/* ── TABLE ── */
+.stDataFrame { border-radius: 12px !important; overflow: hidden !important; }
+.stDataFrame th {
+    background: #f8fafc !important;
+    color: #374151 !important;
+    font-weight: 600 !important;
+    font-size: 0.8rem !important;
+    text-transform: uppercase !important;
+    letter-spacing: 0.04em !important;
+}
 
-    /* Badges */
-    .badge {
-        display: inline-block;
-        padding: 2px 10px;
-        border-radius: 99px;
-        font-size: 0.75rem;
-        font-weight: 600;
-    }
-    .badge-sim { background:#d4edda; color:#155724; }
-    .badge-nao { background:#f8d7da; color:#721c24; }
+/* ── BADGE ── */
+.badge-sim { background:#d1fae5; color:#065f46; padding:2px 10px; border-radius:99px; font-size:.75rem; font-weight:600; }
+.badge-nao { background:#fee2e2; color:#991b1b; padding:2px 10px; border-radius:99px; font-size:.75rem; font-weight:600; }
+
+/* ── SEARCH BAR ── */
+.stTextInput input {
+    border-radius: 10px !important;
+    border: 1.5px solid #e5e7eb !important;
+    padding: 10px 14px !important;
+    font-size: 0.9rem !important;
+}
+.stTextInput input:focus { border-color: #1a56db !important; box-shadow: 0 0 0 3px rgba(26,86,219,0.1) !important; }
+
+/* ── SELECTBOX ── */
+.stSelectbox > div > div {
+    border-radius: 10px !important;
+    border: 1.5px solid #e5e7eb !important;
+}
+
+/* ── SHEETS INPUT ── */
+.sheets-box {
+    background: #f0f7ff;
+    border: 1.5px solid #bfdbfe;
+    border-radius: 12px;
+    padding: 16px 20px;
+    margin-bottom: 16px;
+}
+.sheets-box p { color: #1e40af; font-size: 0.85rem; margin: 0 0 8px 0; }
+
+/* ── PAGE TABS ── */
+div[data-testid="stHorizontalBlock"] { gap: 0 !important; }
+
+/* Streamlit tab styling */
+.stTabs [data-baseweb="tab-list"] {
+    gap: 4px;
+    background: #f1f5f9;
+    border-radius: 12px;
+    padding: 4px;
+    margin-bottom: 24px;
+}
+.stTabs [data-baseweb="tab"] {
+    border-radius: 8px;
+    padding: 8px 20px;
+    font-weight: 500;
+    font-size: 0.9rem;
+    color: #6b7280;
+}
+.stTabs [aria-selected="true"] {
+    background: white !important;
+    color: #0d1f3c !important;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+}
+.stTabs [data-baseweb="tab-highlight"] { display: none; }
+.stTabs [data-baseweb="tab-border"] { display: none; }
+
 </style>
 """, unsafe_allow_html=True)
 
 
-# ── Funções utilitárias ─────────────────────────────────────────────────────
-def calcular_idade(data_nasc_str: str) -> int:
+# ── Helpers ───────────────────────────────────────────────────────────────────
+def calcular_idade(val):
     try:
-        d = pd.to_datetime(data_nasc_str, dayfirst=True)
-        hoje = date.today()
-        return hoje.year - d.year - ((hoje.month, hoje.day) < (d.month, d.day))
+        d = pd.to_datetime(val, dayfirst=True)
+        h = date.today()
+        return h.year - d.year - ((h.month, h.day) < (d.month, d.day))
     except Exception:
         return None
 
 def faixa_etaria(idade):
-    if idade is None:
-        return "Não informado"
-    if idade < 13:
-        return "Crianças (0–12)"
-    if idade < 18:
-        return "Jovens (13–17)"
-    if idade < 30:
-        return "Jovens adultos (18–29)"
-    if idade < 60:
-        return "Adultos (30–59)"
+    if idade is None: return "Não informado"
+    if idade < 13:   return "Crianças (0–12)"
+    if idade < 18:   return "Jovens (13–17)"
+    if idade < 30:   return "Jovens adultos (18–29)"
+    if idade < 60:   return "Adultos (30–59)"
     return "Idosos (60+)"
 
-def eh_aniversariante_mes(data_nasc_str: str) -> bool:
-    try:
-        d = pd.to_datetime(data_nasc_str, dayfirst=True)
-        return d.month == date.today().month
-    except Exception:
-        return False
+def mes_nasc(val):
+    try: return pd.to_datetime(val, dayfirst=True).month
+    except: return None
 
-def dia_nascimento(data_nasc_str: str) -> int:
-    try:
-        return pd.to_datetime(data_nasc_str, dayfirst=True).day
-    except Exception:
-        return 99
+def dia_nasc(val):
+    try: return pd.to_datetime(val, dayfirst=True).day
+    except: return 99
 
-def normalizar_df(df: pd.DataFrame) -> pd.DataFrame:
-    """Normaliza colunas: strip, title case em nomes, upper em bairro."""
-    col_map = {c: c.strip() for c in df.columns}
-    df = df.rename(columns=col_map)
+def normalizar(df):
+    df.columns = [c.strip() for c in df.columns]
+    if "Email" in df.columns:
+        df = df.drop(columns=["Email"])
     if "Nome Completo" in df.columns:
         df["Nome Completo"] = df["Nome Completo"].str.strip().str.title()
     if "Bairro" in df.columns:
         df["Bairro"] = df["Bairro"].str.strip().str.title()
     if "Membro Ativo" in df.columns:
         df["Membro Ativo"] = df["Membro Ativo"].str.strip().str.capitalize()
-    df["Idade"] = df["Data de Nascimento"].apply(calcular_idade)
+    df["Idade"]       = df["Data de Nascimento"].apply(calcular_idade)
     df["Faixa Etária"] = df["Idade"].apply(faixa_etaria)
-    df["Aniversário Mês"] = df["Data de Nascimento"].apply(eh_aniversariante_mes)
+    df["_mes"]        = df["Data de Nascimento"].apply(mes_nasc)
+    df["_dia"]        = df["Data de Nascimento"].apply(dia_nasc)
     return df
 
 @st.cache_data
-def carregar_dados_padrao():
+def carregar_padrao():
     return pd.read_csv("dados_membros.csv", encoding="utf-8-sig")
 
-
-# ── Sidebar ─────────────────────────────────────────────────────────────────
-with st.sidebar:
-    st.markdown("## ✝️ Igreja Batista\nde Pindorama")
-    st.markdown("---")
-
-    pagina = st.radio(
-        "Navegação",
-        ["📊 Visão Geral", "🎂 Aniversariantes", "👥 Membros"],
-        label_visibility="collapsed",
-    )
-
-    st.markdown("---")
-    st.markdown("### 📂 Dados")
-
-    modo = st.radio(
-        "Fonte dos dados",
-        ["Dados de demonstração", "Carregar CSV próprio"],
-        label_visibility="collapsed",
-    )
-
-    df_raw = None
-    if modo == "Carregar CSV próprio":
-        st.markdown(
-            '<div class="upload-hint">📥 Exporte o CSV do Google Forms e faça upload aqui</div>',
-            unsafe_allow_html=True,
-        )
-        uploaded = st.file_uploader("Selecionar arquivo CSV", type=["csv"], label_visibility="collapsed")
-        if uploaded:
-            df_raw = pd.read_csv(uploaded, encoding="utf-8-sig")
-            st.success(f"✅ {len(df_raw)} registros carregados")
-
-    if df_raw is None:
-        df_raw = carregar_dados_padrao()
-
-    df = normalizar_df(df_raw.copy())
-
-    # Filtro rápido de ativos
-    mostrar = st.radio("Exibir membros", ["Todos", "Apenas ativos", "Apenas inativos"])
-    if mostrar == "Apenas ativos":
-        df = df[df["Membro Ativo"] == "Sim"]
-    elif mostrar == "Apenas inativos":
-        df = df[df["Membro Ativo"] == "Não"]
-
-    st.markdown("---")
-    st.caption(f"Total carregado: **{len(df)}** membros")
+@st.cache_data(ttl=300)  # cache 5 min
+def carregar_sheets(url):
+    """Lê Google Sheets publicada como CSV."""
+    # converte URL de edição para exportação CSV
+    if "spreadsheets/d/" in url:
+        sheet_id = url.split("/d/")[1].split("/")[0]
+        csv_url = f"https://docs.google.com/spreadsheets/d/{sheet_id}/export?format=csv"
+    else:
+        csv_url = url
+    return pd.read_csv(csv_url, encoding="utf-8-sig")
 
 
-# ── Header ──────────────────────────────────────────────────────────────────
-mes_nome = date.today().strftime("%B de %Y").capitalize()
+# ── TOP NAV ───────────────────────────────────────────────────────────────────
+hoje = date.today()
 st.markdown(f"""
-<div class="app-header">
-    <h1>✝️ Igreja Batista de Pindorama</h1>
-    <p>Painel de Gestão de Membros · {mes_nome}</p>
+<div class="topnav">
+    <div class="topnav-brand">
+        <span class="cross">✝️</span>
+        <div>
+            <div class="name">Igreja Batista de Pindorama</div>
+            <div class="sub">Painel de Gestão de Membros</div>
+        </div>
+    </div>
+    <div class="topnav-date">{hoje.strftime("%d de %B de %Y")}</div>
 </div>
 """, unsafe_allow_html=True)
 
 
-# ══════════════════════════════════════════════════════════════════════════════
-# PÁGINA 1 — VISÃO GERAL
-# ══════════════════════════════════════════════════════════════════════════════
-if pagina == "📊 Visão Geral":
-    ativos = len(df[df["Membro Ativo"] == "Sim"])
-    inativos = len(df[df["Membro Ativo"] == "Não"])
-    aniversariantes = df["Aniversário Mês"].sum()
+# ── DATA SOURCE (expander discreto) ──────────────────────────────────────────
+with st.expander("⚙️ Fonte de dados", expanded=False):
+    fonte = st.radio(
+        "Fonte",
+        ["📋 Dados de demonstração", "📊 Google Sheets (ao vivo)", "📂 Upload de CSV"],
+        horizontal=True,
+        label_visibility="collapsed",
+    )
+
+    df_raw = None
+
+    if fonte == "📊 Google Sheets (ao vivo)":
+        st.markdown("""
+        <div class="sheets-box">
+            <p>🔗 <strong>Como conectar:</strong> Abra sua planilha → <em>Arquivo → Compartilhar → Publicar na web</em>
+            → escolha a aba → formato CSV → copie o link e cole abaixo.</p>
+        </div>
+        """, unsafe_allow_html=True)
+        sheets_url = st.text_input("URL da planilha Google Sheets", placeholder="https://docs.google.com/spreadsheets/d/...")
+        if sheets_url:
+            try:
+                df_raw = carregar_sheets(sheets_url)
+                st.success(f"✅ {len(df_raw)} registros carregados da planilha")
+            except Exception as e:
+                st.error(f"Erro ao carregar planilha: {e}")
+
+    elif fonte == "📂 Upload de CSV":
+        up = st.file_uploader("Selecionar CSV exportado do Google Forms", type=["csv"], label_visibility="collapsed")
+        if up:
+            df_raw = pd.read_csv(up, encoding="utf-8-sig")
+            st.success(f"✅ {len(df_raw)} registros carregados")
+
+    if df_raw is None:
+        df_raw = carregar_padrao()
+
+df = normalizar(df_raw.copy())
+hoje_mes = hoje.month
+hoje_dia = hoje.day
+
+
+# ── TABS (menu horizontal) ────────────────────────────────────────────────────
+tab1, tab2, tab3 = st.tabs(["📊  Visão Geral", "🎂  Aniversariantes", "👥  Membros"])
+
+
+# ════════════════════════════════════════════════════════════
+# TAB 1 — VISÃO GERAL
+# ════════════════════════════════════════════════════════════
+with tab1:
+    ativos      = len(df[df.get("Membro Ativo", pd.Series(dtype=str)) == "Sim"]) if "Membro Ativo" in df else len(df)
+    aniv_mes    = int((df["_mes"] == hoje_mes).sum())
     idade_media = int(df["Idade"].dropna().mean()) if df["Idade"].dropna().any() else "—"
 
-    c1, c2, c3, c4 = st.columns(4)
-    with c1:
-        st.markdown(f'<div class="metric-card"><div class="value">{len(df)}</div><div class="label">Total de Membros</div></div>', unsafe_allow_html=True)
-    with c2:
-        st.markdown(f'<div class="metric-card"><div class="value">{ativos}</div><div class="label">Membros Ativos</div></div>', unsafe_allow_html=True)
-    with c3:
-        st.markdown(f'<div class="metric-card"><div class="value">{aniversariantes}</div><div class="label">Aniversários este mês</div></div>', unsafe_allow_html=True)
-    with c4:
-        st.markdown(f'<div class="metric-card"><div class="value">{idade_media}</div><div class="label">Idade média (anos)</div></div>', unsafe_allow_html=True)
+    # Metric cards via HTML
+    st.markdown(f"""
+    <div class="metric-grid">
+        <div class="mcard blue">
+            <div class="ico">👥</div>
+            <div class="val">{len(df)}</div>
+            <div class="lbl">Total de membros</div>
+        </div>
+        <div class="mcard green">
+            <div class="ico">✅</div>
+            <div class="val">{ativos}</div>
+            <div class="lbl">Membros ativos</div>
+        </div>
+        <div class="mcard amber">
+            <div class="ico">🎂</div>
+            <div class="val">{aniv_mes}</div>
+            <div class="lbl">Aniversários este mês</div>
+        </div>
+        <div class="mcard rose">
+            <div class="ico">📅</div>
+            <div class="val">{idade_media}</div>
+            <div class="lbl">Idade média (anos)</div>
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
 
-    st.markdown("<br>", unsafe_allow_html=True)
     col_a, col_b = st.columns(2)
 
+    ORDEM_FAIXA = ["Crianças (0–12)", "Jovens (13–17)", "Jovens adultos (18–29)", "Adultos (30–59)", "Idosos (60+)"]
+
     with col_a:
-        st.markdown("### 👥 Distribuição por Faixa Etária")
-        ordem_faixa = ["Crianças (0–12)", "Jovens (13–17)", "Jovens adultos (18–29)", "Adultos (30–59)", "Idosos (60+)"]
-        faixa_counts = df["Faixa Etária"].value_counts().reindex(ordem_faixa).dropna()
-        st.bar_chart(faixa_counts, color="#0f3460")
+        st.markdown('<div class="chart-card"><p class="sec-title">👤 Faixa Etária</p>', unsafe_allow_html=True)
+        faixa_counts = (
+            df["Faixa Etária"]
+            .value_counts()
+            .reindex(ORDEM_FAIXA)
+            .dropna()
+            .rename("Membros")
+        )
+        st.bar_chart(faixa_counts, color="#1a56db", use_container_width=True)
+        st.markdown('</div>', unsafe_allow_html=True)
 
     with col_b:
-        st.markdown("### 🏘️ Membros por Bairro")
-        bairro_counts = df["Bairro"].value_counts().head(10)
-        st.bar_chart(bairro_counts, color="#e67e22")
+        st.markdown('<div class="chart-card"><p class="sec-title">🏘️ Membros por Bairro</p>', unsafe_allow_html=True)
+        bairro_counts = df["Bairro"].value_counts().head(10).rename("Membros")
+        st.bar_chart(bairro_counts, color="#057a55", use_container_width=True)
+        st.markdown('</div>', unsafe_allow_html=True)
 
-    st.markdown("### ⚧ Distribuição por Gênero")
     if "Gênero" in df.columns:
-        genero_counts = df["Gênero"].value_counts()
-        col_g1, col_g2, col_g3 = st.columns([1, 2, 1])
-        with col_g2:
-            st.bar_chart(genero_counts, color="#27ae60")
+        col_c, col_d = st.columns([1, 2])
+        with col_c:
+            st.markdown('<div class="chart-card"><p class="sec-title">⚧ Gênero</p>', unsafe_allow_html=True)
+            genero_counts = df["Gênero"].value_counts().rename("Membros")
+            st.bar_chart(genero_counts, color="#c27803", use_container_width=True)
+            st.markdown('</div>', unsafe_allow_html=True)
 
 
-# ══════════════════════════════════════════════════════════════════════════════
-# PÁGINA 2 — ANIVERSARIANTES
-# ══════════════════════════════════════════════════════════════════════════════
-elif pagina == "🎂 Aniversariantes":
-    st.markdown(f"### 🎂 Aniversariantes de {date.today().strftime('%B')}")
+# ════════════════════════════════════════════════════════════
+# TAB 2 — ANIVERSARIANTES
+# ════════════════════════════════════════════════════════════
+with tab2:
+    nome_mes = hoje.strftime("%B").capitalize()
+    st.markdown(f'<p class="sec-title">🎂 Aniversariantes de {nome_mes}</p>', unsafe_allow_html=True)
 
-    aniv = df[df["Aniversário Mês"]].copy()
-    aniv["_dia"] = aniv["Data de Nascimento"].apply(dia_nascimento)
-    aniv = aniv.sort_values("_dia")
+    aniv_df = df[df["_mes"] == hoje_mes].sort_values("_dia").copy()
 
-    if aniv.empty:
-        st.info("Nenhum aniversariante encontrado para este mês.")
+    if aniv_df.empty:
+        st.info("Nenhum aniversariante este mês.")
     else:
-        st.caption(f"🎉 {len(aniv)} aniversariante(s) este mês")
-        st.markdown("<br>", unsafe_allow_html=True)
+        # Renderiza cards em grid 2 colunas
+        cards_html = '<div class="bday-grid">'
+        for _, row in aniv_df.iterrows():
+            dia    = row["_dia"]
+            nome   = row.get("Nome Completo", "—")
+            idade  = row.get("Idade", "—")
+            bairro = row.get("Bairro", "—")
+            tel    = row.get("Telefone", "—")
 
-        cols = st.columns(2)
-        for i, (_, row) in enumerate(aniv.iterrows()):
-            col = cols[i % 2]
-            with col:
-                dia = row["_dia"]
-                hoje_dia = date.today().day
-                icone = "🎂" if dia == hoje_dia else ("🎈" if dia > hoje_dia else "✅")
-                nome = row.get("Nome Completo", "—")
-                bairro = row.get("Bairro", "—")
-                idade = row.get("Idade", "—")
-                tel = row.get("Telefone", "—")
+            if dia == hoje_dia:
+                cls, ico = "today", "🎉"
+            elif dia > hoje_dia:
+                cls, ico = "",      "🎂"
+            else:
+                cls, ico = "past",  "✅"
 
-                st.markdown(f"""
-                <div class="birthday-card">
-                    <div style="font-size:2rem">{icone}</div>
-                    <div>
-                        <div class="name">{nome}</div>
-                        <div class="detail">Dia {dia} · {idade} anos · {bairro}</div>
-                        <div class="detail">📱 {tel}</div>
-                    </div>
+            cards_html += f"""
+            <div class="bday-card {cls}">
+                <div class="bday-ico">{ico}</div>
+                <div>
+                    <div class="bday-name">Dia {dia:02d} · {nome}</div>
+                    <div class="bday-detail">{idade} anos · {bairro}</div>
+                    <div class="bday-detail">📱 {tel}</div>
                 </div>
-                """, unsafe_allow_html=True)
+            </div>"""
+        cards_html += '</div>'
+        st.markdown(cards_html, unsafe_allow_html=True)
 
-    # Próximos meses (preview)
-    st.markdown("---")
-    st.markdown("### 📅 Próximo mês")
-    proximo_mes = (date.today().month % 12) + 1
+    # Próximo mês
+    st.markdown("<br>", unsafe_allow_html=True)
+    proximo = (hoje_mes % 12) + 1
+    nome_prox = date(hoje.year, proximo, 1).strftime("%B").capitalize()
+    st.markdown(f'<p class="sec-title">📅 Próximo mês — {nome_prox}</p>', unsafe_allow_html=True)
 
-    def eh_proximo_mes(data_nasc_str):
-        try:
-            return pd.to_datetime(data_nasc_str, dayfirst=True).month == proximo_mes
-        except Exception:
-            return False
-
-    prox = df[df["Data de Nascimento"].apply(eh_proximo_mes)]
-    if prox.empty:
+    prox_df = df[df["_mes"] == proximo].sort_values("_dia")
+    if prox_df.empty:
         st.info("Nenhum aniversariante no próximo mês.")
     else:
-        st.caption(f"{len(prox)} aniversariante(s) no próximo mês")
-        st.dataframe(
-            prox[["Nome Completo", "Data de Nascimento", "Idade", "Bairro", "Telefone"]].reset_index(drop=True),
-            use_container_width=True,
-            hide_index=True,
-        )
+        colunas = [c for c in ["Nome Completo", "Data de Nascimento", "Idade", "Bairro", "Telefone"] if c in prox_df.columns]
+        st.dataframe(prox_df[colunas].reset_index(drop=True), use_container_width=True, hide_index=True)
 
 
-# ══════════════════════════════════════════════════════════════════════════════
-# PÁGINA 3 — MEMBROS
-# ══════════════════════════════════════════════════════════════════════════════
-elif pagina == "👥 Membros":
-    st.markdown("### 👥 Lista de Membros")
+# ════════════════════════════════════════════════════════════
+# TAB 3 — MEMBROS
+# ════════════════════════════════════════════════════════════
+with tab3:
+    st.markdown('<p class="sec-title">👥 Lista de Membros</p>', unsafe_allow_html=True)
 
-    col_f1, col_f2, col_f3 = st.columns(3)
-    with col_f1:
-        busca = st.text_input("🔍 Buscar por nome", placeholder="Digite o nome...")
-    with col_f2:
-        bairros = ["Todos"] + sorted(df["Bairro"].dropna().unique().tolist())
-        bairro_sel = st.selectbox("🏘️ Filtrar por bairro", bairros)
-    with col_f3:
-        faixas = ["Todas"] + ["Crianças (0–12)", "Jovens (13–17)", "Jovens adultos (18–29)", "Adultos (30–59)", "Idosos (60+)"]
-        faixa_sel = st.selectbox("👤 Filtrar por faixa etária", faixas)
+    f1, f2, f3, f4 = st.columns([2, 1.5, 1.5, 1])
+    with f1:
+        busca = st.text_input("Buscar por nome", placeholder="🔍  Digite o nome...", label_visibility="collapsed")
+    with f2:
+        bairros = ["Todos os bairros"] + sorted(df["Bairro"].dropna().unique().tolist())
+        bairro_sel = st.selectbox("Bairro", bairros, label_visibility="collapsed")
+    with f3:
+        faixas = ["Todas as faixas"] + ORDEM_FAIXA
+        faixa_sel = st.selectbox("Faixa", faixas, label_visibility="collapsed")
+    with f4:
+        ativo_sel = st.selectbox("Status", ["Todos", "Ativos", "Inativos"], label_visibility="collapsed")
 
-    df_filtrado = df.copy()
+    df_f = df.copy()
     if busca:
-        df_filtrado = df_filtrado[df_filtrado["Nome Completo"].str.lower().str.contains(busca.lower(), na=False)]
-    if bairro_sel != "Todos":
-        df_filtrado = df_filtrado[df_filtrado["Bairro"] == bairro_sel]
-    if faixa_sel != "Todas":
-        df_filtrado = df_filtrado[df_filtrado["Faixa Etária"] == faixa_sel]
+        df_f = df_f[df_f["Nome Completo"].str.lower().str.contains(busca.lower(), na=False)]
+    if bairro_sel != "Todos os bairros":
+        df_f = df_f[df_f["Bairro"] == bairro_sel]
+    if faixa_sel != "Todas as faixas":
+        df_f = df_f[df_f["Faixa Etária"] == faixa_sel]
+    if ativo_sel == "Ativos" and "Membro Ativo" in df_f.columns:
+        df_f = df_f[df_f["Membro Ativo"] == "Sim"]
+    elif ativo_sel == "Inativos" and "Membro Ativo" in df_f.columns:
+        df_f = df_f[df_f["Membro Ativo"] == "Não"]
 
-    st.caption(f"{len(df_filtrado)} resultado(s) encontrado(s)")
+    st.caption(f"{len(df_f)} membro(s) encontrado(s)")
 
-    colunas_exibir = ["Nome Completo", "Data de Nascimento", "Idade", "Faixa Etária", "Gênero", "Bairro", "Telefone", "Membro Ativo"]
-    colunas_existentes = [c for c in colunas_exibir if c in df_filtrado.columns]
+    COLS = ["Nome Completo", "Data de Nascimento", "Idade", "Faixa Etária", "Gênero", "Bairro", "Telefone", "Membro Ativo"]
+    cols_ok = [c for c in COLS if c in df_f.columns]
 
-    st.dataframe(
-        df_filtrado[colunas_existentes].reset_index(drop=True),
-        use_container_width=True,
-        hide_index=True,
-    )
+    st.dataframe(df_f[cols_ok].reset_index(drop=True), use_container_width=True, hide_index=True)
 
-    st.markdown("---")
-    # Download
-    csv_export = df_filtrado[colunas_existentes].to_csv(index=False, encoding="utf-8-sig").encode("utf-8-sig")
-    st.download_button(
-        label="⬇️ Exportar lista filtrada (.csv)",
-        data=csv_export,
-        file_name="membros_filtrados.csv",
-        mime="text/csv",
-    )
+    csv_export = df_f[cols_ok].to_csv(index=False, encoding="utf-8-sig").encode("utf-8-sig")
+    st.download_button("⬇️ Exportar lista filtrada (.csv)", csv_export, "membros_filtrados.csv", "text/csv")
+
